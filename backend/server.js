@@ -7,7 +7,9 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 app.use(cors({
-    origin: ['http://localhost:3000', 'https://app-dev-assignment-5.vercel.app']
+    origin: ['http://localhost:3000', 
+             'https://app-dev-assignment-5.vercel.app',
+             'https://app-dev-assignment-5-m4ukyptzv-basel118200s-projects.vercel.app']
 }));
 
 const db = new Pool({
