@@ -6,7 +6,7 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 app.use(cors({
-    origin: ['http://localhost:3000']  // we'll add the Vercel URL later
+    origin: ['http://localhost:3000', 'https://app-dev-assignment-5.vercel.app']
 }));
 
 const { Pool } = require('pg');
