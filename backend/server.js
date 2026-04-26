@@ -1,4 +1,5 @@
 const express = require('express');
+const { Pool } = require('pg');
 const cors = require('cors');
 const dotenv = require('dotenv');
 dotenv.config();
@@ -9,47 +10,25 @@ app.use(cors({
     origin: ['http://localhost:3000', 'https://app-dev-assignment-5.vercel.app']
 }));
 
-const { Pool } = require('pg');
-
 const db = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false }
 });
 
-
-
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-    // Handle the error appropriately, e.g., log it or send an alert
-});
-
-// Centralized database connection handling
-process.on('SIGINT', async () => {
-    await db.end();
-    process.exit();
-});
-
 const getLastStudentID = async () => {
-    const { rows } = await db.query('SELECT MAX(id) AS lastID FROM student');
-    const lastID = rows[0].lastid || 0;
-    return lastID;
+    const result = await db.query('SELECT MAX(id) AS lastID FROM student');
+    return result.rows[0].lastid || 0;
 };
 
 const getLastteacherID = async () => {
-    const { rows } = await db.query('SELECT MAX(id) AS lastID FROM teacher');
-    const lastID = rows[0].lastid || 0;
-    return lastID;
+    const result = await db.query('SELECT MAX(id) AS lastID FROM teacher');
+    return result.rows[0].lastid || 0;
 };
-
-// app.get('/', (req, res) => {
-//     return res.json("From Backend!!!");
-// });
 
 app.get('/', async (req, res) => {
     try {
-        // Fetch data from the student table
-        const { rows } = await db.query("SELECT * FROM student");
-        return res.json({ message: "From Backend!!!", studentData: rows });
+        const data = await db.query("SELECT * FROM student");
+        return res.json({ message: "From Backend!!!", studentData: data.rows });
     } catch (error) {
         console.error('Error fetching student data:', error);
         return res.status(500).json({ error: 'Error fetching student data' });
@@ -57,29 +36,21 @@ app.get('/', async (req, res) => {
 });
 
 app.get('/student', async (req, res) => {
-    const { rows } = await db.query("SELECT * FROM student");
-    return res.json(rows);
+    const data = await db.query("SELECT * FROM student");
+    return res.json(data.rows);
 });
 
 app.get('/teacher', async (req, res) => {
-    const { rows } = await db.query("SELECT * FROM teacher");
-    return res.json(rows);
+    const data = await db.query("SELECT * FROM teacher");
+    return res.json(data.rows);
 });
 
 app.post('/addstudent', async (req, res) => {
     try {
         const lastStudentID = await getLastStudentID();
         const nextStudentID = lastStudentID + 1;
-
-        const studentData = {
-            id: nextStudentID,
-            name: req.body.name,
-            roll_number: req.body.rollNo,
-            class: req.body.class,
-        };
-
         const sql = `INSERT INTO student (id, name, roll_number, class) VALUES ($1, $2, $3, $4)`;
-        await db.query(sql, [studentData.id, studentData.name, studentData.roll_number, studentData.class]);
+        await db.query(sql, [nextStudentID, req.body.name, req.body.rollNo, req.body.class]);
         return res.json({ message: 'Data inserted successfully' });
     } catch (error) {
         console.error('Error:', error);
@@ -91,16 +62,8 @@ app.post('/addteacher', async (req, res) => {
     try {
         const lastteacherID = await getLastteacherID();
         const nextteacherID = lastteacherID + 1;
-
-        const TeacherData = {
-            id: nextteacherID,
-            name: req.body.name,
-            subject: req.body.subject,
-            class: req.body.class,
-        };
-
         const sql = `INSERT INTO teacher (id, name, subject, class) VALUES ($1, $2, $3, $4)`;
-        await db.query(sql, [TeacherData.id, TeacherData.name, TeacherData.subject, TeacherData.class]);
+        await db.query(sql, [nextteacherID, req.body.name, req.body.subject, req.body.class]);
         return res.json({ message: 'Data inserted successfully' });
     } catch (error) {
         console.error('Error:', error);
@@ -110,20 +73,12 @@ app.post('/addteacher', async (req, res) => {
 
 app.delete('/student/:id', async (req, res) => {
     const studentId = req.params.id;
-    const sqlDelete = 'DELETE FROM student WHERE id = $1';
-    const sqlSelect = 'SELECT id FROM student ORDER BY id';
-
     try {
-        await db.query(sqlDelete, [studentId]);
-
-        const { rows } = await db.query(sqlSelect);
-
-        const updatePromises = rows.map(async (row, index) => {
-            const newId = index + 1;
-            await db.query('UPDATE student SET id = $1 WHERE id = $2', [newId, row.id]);
-        });
-
-        await Promise.all(updatePromises);
+        await db.query('DELETE FROM student WHERE id = $1', [studentId]);
+        const rows = await db.query('SELECT id FROM student ORDER BY id');
+        for (let i = 0; i < rows.rows.length; i++) {
+            await db.query('UPDATE student SET id = $1 WHERE id = $2', [i + 1, rows.rows[i].id]);
+        }
         return res.json({ message: 'Student deleted successfully' });
     } catch (error) {
         console.error('Error:', error);
@@ -133,20 +88,12 @@ app.delete('/student/:id', async (req, res) => {
 
 app.delete('/teacher/:id', async (req, res) => {
     const teacherID = req.params.id;
-    const sqlDelete = 'DELETE FROM teacher WHERE id = $1';
-    const sqlSelect = 'SELECT id FROM teacher ORDER BY id';
-
     try {
-        await db.query(sqlDelete, [teacherID]);
-
-        const { rows } = await db.query(sqlSelect);
-
-        const updatePromises = rows.map(async (row, index) => {
-            const newId = index + 1;
-            await db.query('UPDATE teacher SET id = $1 WHERE id = $2', [newId, row.id]);
-        });
-
-        await Promise.all(updatePromises);
+        await db.query('DELETE FROM teacher WHERE id = $1', [teacherID]);
+        const rows = await db.query('SELECT id FROM teacher ORDER BY id');
+        for (let i = 0; i < rows.rows.length; i++) {
+            await db.query('UPDATE teacher SET id = $1 WHERE id = $2', [i + 1, rows.rows[i].id]);
+        }
         return res.json({ message: 'Teacher deleted successfully' });
     } catch (error) {
         console.error('Error:', error);
